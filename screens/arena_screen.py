@@ -19,6 +19,8 @@ import datetime
 import cv2
 from scipy.io import wavfile
 from datetime import datetime
+import mediapipe as mp
+
 
 # Add the root directory of your project to the Python path
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -113,6 +115,9 @@ class ArenaScreen(QWidget):
         self.quizmistress_config.model_args.speakers_file = os.path.join(assets_dir, "text_to_speech/quizmistress.pth")
         self.quizmistress_vits = Vits.init_from_config(self.quizmistress_config)
         self.quizmistress_vits.load_onnx(quizmistress_model_path)
+
+        mp_hands = mp.solutions.hands
+        self.hands = mp_hands.Hands()
 
         self.initUI()
         self.set_default_devices()
@@ -571,7 +576,6 @@ class ArenaScreen(QWidget):
             current_school = current_question['school']
             if current_school not in self.selected_schools:
                 cap = cv2.VideoCapture(0)
-                hand_cascade = cv2.CascadeClassifier(os.path.join(self.assets_dir, "palm.xml"))
 
                 start_time = time.time()
                 while True:
@@ -579,11 +583,12 @@ class ArenaScreen(QWidget):
                     if not ret:
                         break
 
-                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                    hands = hand_cascade.detectMultiScale(gray, 1.3, 5)
+                    # Convert the frame to RGB as MediaPipe requires RGB input
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    results = self.hands.process(rgb_frame)
 
-                    if len(hands) > 0:
-                        # print("Hand detected!")
+                    if results.multi_hand_landmarks:
+                        # Hand detected
                         self.play_quizmistress_audio(f"Go ahead {self.user_info['school']}")
                         self.hand_raised.emit()
                         self.record_audio()
@@ -602,6 +607,7 @@ class ArenaScreen(QWidget):
                 self.text_box.setText(attempted_response)
                 QApplication.processEvents()
                 self.submit_answer()
+
 
     def start_quiz(self):
         # print("Start Quiz Running")
