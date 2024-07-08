@@ -1,1 +1,2 @@
 assets/text_to_speech/coqui_vits.onnx filter=lfs diff=lfs merge=lfs -text
+assets/text_to_speech/quizmistress.onnx filter=lfs diff=lfs merge=lfs -text

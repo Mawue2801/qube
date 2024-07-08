@@ -97,13 +97,22 @@ class ArenaScreen(QWidget):
         db_manager = DatabaseManager()
         self.user_info = db_manager.get_user_info(username)
 
-        config_path = os.path.join(assets_dir, "text_to_speech/config.json")
-        model_path = os.path.join(assets_dir, "text_to_speech/coqui_vits.onnx")
+        student_config_path = os.path.join(assets_dir, "text_to_speech/config.json")
+        student_model_path = os.path.join(assets_dir, "text_to_speech/coqui_vits.onnx")
 
-        self.config = VitsConfig()
-        self.config.load_json(config_path)
-        self.vits = Vits.init_from_config(self.config)
-        self.vits.load_onnx(model_path)
+        quizmistress_config_path = os.path.join(assets_dir, "text_to_speech/quizmistress config.json")
+        quizmistress_model_path = os.path.join(assets_dir, "text_to_speech/quizmistress.onnx")
+
+        self.student_config = VitsConfig()
+        self.student_config.load_json(student_config_path)
+        self.student_vits = Vits.init_from_config(self.student_config)
+        self.student_vits.load_onnx(student_model_path)
+
+        self.quizmistress_config = VitsConfig()
+        self.quizmistress_config.load_json(quizmistress_config_path)
+        self.quizmistress_config.model_args.speakers_file = os.path.join(assets_dir, "text_to_speech/quizmistress.pth")
+        self.quizmistress_vits = Vits.init_from_config(self.quizmistress_config)
+        self.quizmistress_vits.load_onnx(quizmistress_model_path)
 
         self.initUI()
         self.set_default_devices()
@@ -491,12 +500,21 @@ class ArenaScreen(QWidget):
             sd.wait()
             # print("Playback complete.")
     
-    def tts_call(self, text: str, output_path: str):
+    def quizmistress_tts_call(self, text: str, output_path: str):
         text_inputs = np.asarray(
-            self.vits.tokenizer.text_to_ids(text, language="en"),
+            self.quizmistress_vits.tokenizer.text_to_ids(text, language="en"),
             dtype=np.int64,
         )[None, :]
-        audio = self.vits.inference_onnx(text_inputs)
+        audio = self.quizmistress_vits.inference_onnx(text_inputs,speaker_id=0)
+        save_wav(wav=audio[0], path=output_path, sample_rate=22050)
+        return output_path
+    
+    def student_tts_call(self, text: str, output_path: str):
+        text_inputs = np.asarray(
+            self.student_vits.tokenizer.text_to_ids(text, language="en"),
+            dtype=np.int64,
+        )[None, :]
+        audio = self.student_vits.inference_onnx(text_inputs)
         save_wav(wav=audio[0], path=output_path, sample_rate=22050)
         return output_path
     
@@ -504,7 +522,7 @@ class ArenaScreen(QWidget):
         if self.continue_quiz:
             temp_file_path = "temp_audio.wav"
             # Call the function and save the audio file to the specified path
-            audio_file_path = self.tts_call(response_text, temp_file_path)
+            audio_file_path = self.quizmistress_tts_call(response_text, temp_file_path)
 
             # Output the path of the saved audio file
             # print(f"Audio file saved at: {audio_file_path}")
@@ -517,7 +535,7 @@ class ArenaScreen(QWidget):
         if self.continue_quiz:
             temp_file_path = "temp_audio.wav"
             # Call the function and save the audio file to the specified path
-            audio_file_path = self.tts_call(response_text, temp_file_path)
+            audio_file_path = self.student_tts_call(response_text, temp_file_path)
 
             # Output the path of the saved audio file
             # print(f"Audio file saved at: {audio_file_path}")
@@ -531,7 +549,7 @@ class ArenaScreen(QWidget):
             temp_file_path = "temp_audio.wav"
 
             # Call the function and save the audio file to the specified path
-            audio_file_path = self.tts_call(response_text, temp_file_path)
+            audio_file_path = self.quizmistress_tts_call(response_text, temp_file_path)
 
             # Output the path of the saved audio file
             # print(f"Audio file saved at: {audio_file_path}")
@@ -622,7 +640,7 @@ class ArenaScreen(QWidget):
             formatted_start_time = datetime.fromtimestamp(self.start_time).strftime('%H:%M:%S')
             # print("Starting timer at", formatted_start_time)
             self.time_left = max(0, self.time_limit - elapsed_time)
-            print(f'Time left: {self.time_left} seconds')
+            # print(f'Time left: {self.time_left} seconds')
 
             if self.time_left <= 0:
                 self.quiz_timer.stop()  
